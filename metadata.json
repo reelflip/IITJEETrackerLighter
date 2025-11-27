@@ -1,0 +1,5 @@
+{
+  "name": "JEE PrepPro",
+  "description": "A comprehensive IIT JEE preparation tracker featuring syllabus tracking, test analysis, and an AI-powered study assistant. Uses LocalStorage to simulate a database persistence layer.",
+  "requestFramePermissions": []
+}
