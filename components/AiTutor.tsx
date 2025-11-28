@@ -133,11 +133,15 @@ CORS(app)
 
 # --- DATABASE CONFIGURATION ---
 DB_CONFIG = {
-    'user': 'u131922718_iitjee_user',
-    'password': 'YOUR_DB_PASSWORD',  # <--- REPLACE THIS
-    'host': 'localhost',
+    'host': '82.25.121.80',        # <--- Updated Remote Host IP
+    'user': 'u131922718_iitjee_user', # Check if this matches your panel
+    'password': 'YOUR_DB_PASSWORD',   # <--- REPLACE THIS
     'database': 'u131922718_iitjee_tracker'
 }
+
+# NOTE: Since you are using a Remote IP (82.25.121.80), ensure that
+# "Remote MySQL" is enabled in your hosting panel for the IP address
+# of the machine running this Python script.
 
 def get_db_connection():
     try:
