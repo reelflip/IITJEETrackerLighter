@@ -2,22 +2,20 @@ import { Topic, TestScore, Task, User } from '../types';
 import { INITIAL_TOPICS, MOCK_TEST_DATA } from '../constants';
 
 // ============================================================================
-//  DATABASE CONFIGURATION (CHANGE THIS TO CONNECT TO REAL MYSQL)
+//  DATABASE CONFIGURATION
 // ============================================================================
 
 export const API_CONFIG = {
-  // Set this to TRUE to connect to your real MySQL database via the PHP script
-  USE_REAL_BACKEND: false, 
+  // Set to TRUE to use the PHP/MySQL Backend
+  USE_REAL_BACKEND: true, 
 
-  // The full URL to the api.php file you uploaded to your hosting
-  // If your domain is iitgeeprep.com, the URL would likely be:
-  API_BASE_URL: 'http://www.iitgeeprep.com/api.php' 
-  // API_BASE_URL: 'http://localhost/jee-tracker/api.php' // For localhost testing
+  // The full URL to the api.php file on your server
+  API_BASE_URL: 'https://iitgeeprep.com/api.php' 
+  // API_BASE_URL: 'http://localhost/jee-tracker/api.php' // Use this for local testing
 };
 
 // ============================================================================
 
-// CONSTANTS FOR STORAGE (Simulating DB Tables for Mock Mode)
 const DB_TABLES = {
   TOPICS: 'jee_tracker_topics',
   SCORES: 'jee_tracker_scores',
@@ -25,14 +23,36 @@ const DB_TABLES = {
   USERS: 'jee_tracker_users'
 };
 
-// Simulate Network Latency (Mock Mode only)
 const SIMULATED_LATENCY = 400;
-
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper to get current user ID
+const getCurrentUserId = () => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+        try {
+            return JSON.parse(userStr).id;
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+};
 
 // Helper for Real API Calls
 const apiCall = async (action: string, method: 'GET' | 'POST' = 'GET', body?: any) => {
     try {
+        const userId = getCurrentUserId();
+        
+        // Construct URL with query parameters
+        const url = new URL(API_CONFIG.API_BASE_URL);
+        url.searchParams.append('action', action);
+        
+        // Append userId to GET requests if available
+        if (method === 'GET' && userId) {
+            url.searchParams.append('userId', userId);
+        }
+
         const options: RequestInit = {
             method,
             headers: {
@@ -40,21 +60,29 @@ const apiCall = async (action: string, method: 'GET' | 'POST' = 'GET', body?: an
             },
         };
         
+        // Append userId to POST body if available
         if (body) {
-            options.body = JSON.stringify(body);
+            const payload = { ...body };
+            if (userId && !payload.userId) {
+                payload.userId = userId;
+            }
+            options.body = JSON.stringify(payload);
         }
 
-        // We append the action query param to route the request in PHP
-        const url = `${API_CONFIG.API_BASE_URL}?action=${action}`;
-        const response = await fetch(url, options);
+        const response = await fetch(url.toString(), options);
         
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.statusText} (${response.status})`);
+        // Handle non-JSON responses (like PHP errors printed to screen)
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error("Invalid JSON response from server:", text);
+            throw new Error(`Server Error: ${text.substring(0, 100)}...`);
         }
-        
-        const result = await response.json();
-        if (result.error) {
-            throw new Error(result.error);
+
+        if (!response.ok || result.error) {
+            throw new Error(result.error || `API Error: ${response.statusText}`);
         }
         
         return result.data;
@@ -64,9 +92,8 @@ const apiCall = async (action: string, method: 'GET' | 'POST' = 'GET', body?: an
     }
 };
 
-// Initialize simulated DB tables
 const initializeDatabase = () => {
-  if (API_CONFIG.USE_REAL_BACKEND) return; // Don't init localstorage if using real DB
+  if (API_CONFIG.USE_REAL_BACKEND) return; 
 
   if (!localStorage.getItem(DB_TABLES.TOPICS)) {
     localStorage.setItem(DB_TABLES.TOPICS, JSON.stringify(INITIAL_TOPICS));
@@ -92,12 +119,10 @@ export const dataService = {
   // --- USERS TABLE OPERATIONS ---
   
   registerUser: async (user: Omit<User, 'id'> & { password?: string, securityQuestion?: string, securityAnswer?: string }): Promise<User> => {
-    // REAL BACKEND MODE
     if (API_CONFIG.USE_REAL_BACKEND) {
         return await apiCall('registerUser', 'POST', user);
     }
 
-    // MOCK MODE
     await delay(SIMULATED_LATENCY);
     const data = localStorage.getItem(DB_TABLES.USERS);
     const users: User[] = data ? JSON.parse(data) : [];
@@ -121,18 +146,15 @@ export const dataService = {
   },
 
   loginUser: async (email: string, password: string): Promise<User> => {
-    // REAL BACKEND MODE
     if (API_CONFIG.USE_REAL_BACKEND) {
         return await apiCall('loginUser', 'POST', { email, password });
     }
 
-    // MOCK MODE
     await delay(SIMULATED_LATENCY);
     const data = localStorage.getItem(DB_TABLES.USERS);
     const users: User[] = data ? JSON.parse(data) : [];
     
     const user = users.find(u => u.email === email);
-    // In mock mode we ignore password check for simplicity, but in real mode PHP will check it
     if (!user) {
         throw new Error("Invalid credentials");
     }

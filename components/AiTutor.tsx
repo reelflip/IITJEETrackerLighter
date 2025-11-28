@@ -13,7 +13,7 @@ const SchemaViewer: React.FC = () => {
 
   const schemaSQL = `-- --------------------------------------------------------
 -- HOSTING SETUP INSTRUCTIONS:
--- 1. Select your assigned database in phpMyAdmin (e.g., u131922718_iitjee)
+-- 1. Select your assigned database in phpMyAdmin: u131922718_iitjee_tracker
 -- 2. Run the SQL below to create the required tables.
 -- --------------------------------------------------------
 
@@ -34,13 +34,14 @@ CREATE TABLE IF NOT EXISTS users (
 -- Topics Table
 CREATE TABLE IF NOT EXISTS topics (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL, -- Currently mocked as 0 or 1
+    user_id INT NOT NULL, 
     name VARCHAR(255) NOT NULL,
     subject ENUM('Physics', 'Chemistry', 'Mathematics') NOT NULL,
     status ENUM('Not Started', 'In Progress', 'Completed', 'Revision Done') DEFAULT 'Not Started',
     confidence INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Test Scores Table
@@ -54,7 +55,8 @@ CREATE TABLE IF NOT EXISTS test_scores (
     math_score INT NOT NULL,
     total_score INT GENERATED ALWAYS AS (physics_score + chemistry_score + math_score) STORED,
     max_score INT DEFAULT 300,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Tasks Table
@@ -64,31 +66,45 @@ CREATE TABLE IF NOT EXISTS tasks (
     title VARCHAR(255) NOT NULL,
     is_completed BOOLEAN DEFAULT FALSE,
     due_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 `;
 
   const phpAPI = `<?php
 /**
  * SAVE THIS FILE AS: api.php
- * UPLOAD TO: public_html/jee-tracker/ (or similar folder)
- * UPDATE "services/dataService.ts" with the URL to this file.
+ * UPLOAD TO: public_html/ (or your iitgeeprep.com folder)
+ * ensure services/dataService.ts points to https://iitgeeprep.com/api.php
  */
 
+// Enable Error Reporting for Debugging (Disable in production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// CORS Headers - Allow React App to Connect
 header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
-// --- DATABASE CONFIGURATION (UPDATE THESE) ---
+// Handle Preflight Options Request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
+
+// --- DATABASE CONFIGURATION ---
 $host = 'localhost';
-$db   = 'u131922718_iitjee'; // Your Database Name
-$user = 'u131922718_iitjee'; // Your Database User
-$pass = 'YOUR_DB_PASSWORD';  // Your Database Password
-// ---------------------------------------------
+$db   = 'u131922718_iitjee_tracker'; 
+$user = 'u131922718_iitjee_user'; 
+$pass = 'YOUR_DB_PASSWORD';  // <--- ENTER YOUR REAL DATABASE PASSWORD HERE
+// ------------------------------
 
 $conn = new mysqli($host, $user, $pass, $db);
 
 if ($conn->connect_error) {
+    http_response_code(500);
     die(json_encode(["error" => "Connection failed: " . $conn->connect_error]));
 }
 
@@ -102,22 +118,30 @@ function sendResponse($data) {
     exit;
 }
 
+function sendError($msg) {
+    echo json_encode(["error" => $msg]);
+    exit;
+}
+
 // ---------------- API ROUTES ----------------
 
+// 1. User Registration
 if ($action === 'registerUser' && $method === 'POST') {
-    // Basic registration example
     $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, role, institute, target_year) VALUES (?, ?, ?, ?, ?, ?)");
-    // WARNING: In production, use password_hash($input['password'], PASSWORD_DEFAULT)
     $stmt->bind_param("ssssss", $input['name'], $input['email'], $input['password'], $input['role'], $input['institute'], $input['targetYear']);
     
     if ($stmt->execute()) {
         $input['id'] = $conn->insert_id;
+        // Also Seed Initial Topics for the new user
+        seedTopicsForUser($conn, $conn->insert_id);
+        unset($input['password']); // Don't return password
         sendResponse($input);
     } else {
-        echo json_encode(["error" => $stmt->error]);
+        sendError($stmt->error);
     }
 }
 
+// 2. User Login
 if ($action === 'loginUser' && $method === 'POST') {
     $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
     $stmt->bind_param("s", $input['email']);
@@ -125,17 +149,21 @@ if ($action === 'loginUser' && $method === 'POST') {
     $result = $stmt->get_result();
     $user = $result->fetch_assoc();
 
-    // WARNING: In production, verify hash: password_verify($input['password'], $user['password_hash'])
     if ($user && $user['password_hash'] === $input['password']) {
-        unset($user['password_hash']); // Don't send password back
+        unset($user['password_hash']); 
         sendResponse($user);
     } else {
-        echo json_encode(["error" => "Invalid credentials"]);
+        sendError("Invalid credentials");
     }
 }
 
+// 3. Get Topics
 if ($action === 'getTopics' && $method === 'GET') {
-    $result = $conn->query("SELECT * FROM topics");
+    $userId = $_GET['userId'] ?? 0;
+    $stmt = $conn->prepare("SELECT * FROM topics WHERE user_id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
     $topics = [];
     while ($row = $result->fetch_assoc()) {
         $topics[] = $row;
@@ -143,7 +171,143 @@ if ($action === 'getTopics' && $method === 'GET') {
     sendResponse($topics);
 }
 
-// ... Add similar blocks for 'updateTopic', 'getScores', 'addScore', etc. ...
+// 4. Update Topic
+if ($action === 'updateTopic' && $method === 'POST') {
+    $stmt = $conn->prepare("UPDATE topics SET status=?, confidence=?, updated_at=NOW() WHERE id=?");
+    $stmt->bind_param("sii", $input['status'], $input['confidence'], $input['id']);
+    if ($stmt->execute()) {
+        // Return updated list
+        $userId = $input['userId'] ?? 0; // Ensure userId is passed in body
+        $stmtList = $conn->prepare("SELECT * FROM topics WHERE user_id = ?");
+        $stmtList->bind_param("i", $userId);
+        $stmtList->execute();
+        $res = $stmtList->get_result();
+        $all = [];
+        while ($r = $res->fetch_assoc()) $all[] = $r;
+        sendResponse($all);
+    } else {
+        sendError($stmt->error);
+    }
+}
+
+// 5. Get Scores
+if ($action === 'getScores' && $method === 'GET') {
+    $userId = $_GET['userId'] ?? 0;
+    $stmt = $conn->prepare("SELECT * FROM test_scores WHERE user_id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $scores = [];
+    while ($row = $result->fetch_assoc()) {
+        $scores[] = $row;
+    }
+    sendResponse($scores);
+}
+
+// 6. Add Score
+if ($action === 'addScore' && $method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO test_scores (user_id, test_name, test_date, physics_score, chemistry_score, math_score, max_score) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("issiiii", $input['userId'], $input['testName'], $input['date'], $input['physicsScore'], $input['chemistryScore'], $input['mathScore'], $input['maxScore']);
+    if ($stmt->execute()) {
+        $newId = $conn->insert_id;
+        // Return updated list
+        $stmtList = $conn->prepare("SELECT * FROM test_scores WHERE user_id = ?");
+        $stmtList->bind_param("i", $input['userId']);
+        $stmtList->execute();
+        $res = $stmtList->get_result();
+        $all = [];
+        while ($r = $res->fetch_assoc()) $all[] = $r;
+        sendResponse($all);
+    } else {
+        sendError($stmt->error);
+    }
+}
+
+// 7. Get Tasks
+if ($action === 'getTasks' && $method === 'GET') {
+    $userId = $_GET['userId'] ?? 0;
+    $stmt = $conn->prepare("SELECT * FROM tasks WHERE user_id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $tasks = [];
+    while ($row = $result->fetch_assoc()) {
+        // Convert 1/0 to true/false for frontend
+        $row['isCompleted'] = $row['is_completed'] == 1;
+        $row['dueDate'] = $row['due_date'];
+        $tasks[] = $row;
+    }
+    sendResponse($tasks);
+}
+
+// 8. Add Task
+if ($action === 'addTask' && $method === 'POST') {
+    $stmt = $conn->prepare("INSERT INTO tasks (user_id, title, due_date) VALUES (?, ?, ?)");
+    $stmt->bind_param("iss", $input['userId'], $input['title'], $input['dueDate']);
+    if ($stmt->execute()) {
+        fetchTasks($conn, $input['userId']);
+    } else { sendError($stmt->error); }
+}
+
+// 9. Toggle Task
+if ($action === 'toggleTask' && $method === 'POST') {
+    // First check current status
+    $check = $conn->prepare("SELECT is_completed FROM tasks WHERE id = ?");
+    $check->bind_param("i", $input['id']);
+    $check->execute();
+    $row = $check->get_result()->fetch_assoc();
+    $newState = $row['is_completed'] == 1 ? 0 : 1;
+
+    $stmt = $conn->prepare("UPDATE tasks SET is_completed = ? WHERE id = ?");
+    $stmt->bind_param("ii", $newState, $input['id']);
+    if ($stmt->execute()) {
+        fetchTasks($conn, $input['userId']);
+    } else { sendError($stmt->error); }
+}
+
+// 10. Delete Task
+if ($action === 'deleteTask' && $method === 'POST') {
+    $stmt = $conn->prepare("DELETE FROM tasks WHERE id = ?");
+    $stmt->bind_param("i", $input['id']);
+    if ($stmt->execute()) {
+        fetchTasks($conn, $input['userId']);
+    } else { sendError($stmt->error); }
+}
+
+// Utility to return task list after mod
+function fetchTasks($conn, $userId) {
+    $stmt = $conn->prepare("SELECT * FROM tasks WHERE user_id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $tasks = [];
+    while ($row = $result->fetch_assoc()) {
+        $row['isCompleted'] = $row['is_completed'] == 1;
+        $row['dueDate'] = $row['due_date'];
+        $tasks[] = $row;
+    }
+    sendResponse($tasks);
+}
+
+// Utility to seed topics
+function seedTopicsForUser($conn, $userId) {
+    // Basic seed data
+    $topics = [
+        ['Units & Dimensions', 'Physics', 'Completed', 9],
+        ['Kinematics', 'Physics', 'Completed', 8],
+        ['Newtons Laws', 'Physics', 'In Progress', 6],
+        ['Mole Concept', 'Chemistry', 'Completed', 9],
+        ['Atomic Structure', 'Chemistry', 'In Progress', 7],
+        ['Sets & Relations', 'Mathematics', 'Completed', 8],
+        ['Quadratic Equations', 'Mathematics', 'In Progress', 5]
+    ];
+    
+    $stmt = $conn->prepare("INSERT INTO topics (user_id, name, subject, status, confidence) VALUES (?, ?, ?, ?, ?)");
+    foreach ($topics as $t) {
+        $stmt->bind_param("isssi", $userId, $t[0], $t[1], $t[2], $t[3]);
+        $stmt->execute();
+    }
+}
 
 $conn->close();
 ?>`;
@@ -190,7 +354,7 @@ $conn->close();
                     <p className="text-slate-600 text-sm mt-1 max-w-3xl">
                         {activeTab === 'sql' 
                             ? "Copy the SQL code below and run it in your phpMyAdmin's 'SQL' tab. This will create the necessary tables to store users, topics, and test scores." 
-                            : "React cannot connect directly to MySQL for security. You must use an API. Copy the PHP code below, save it as 'api.php', and upload it to your website folder."}
+                            : "React cannot connect directly to MySQL for security. You must use an API. Copy the PHP code below, save it as 'api.php', add your password, and upload it to your website folder."}
                     </p>
                 </div>
             </div>

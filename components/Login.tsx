@@ -53,6 +53,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         } else {
             user = await dataService.loginUser(formData.email, formData.password);
         }
+        
+        // CRITICAL: Save user to local storage so API service can grab the ID for subsequent requests
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        
         onLogin(user);
     } catch (err: any) {
         setError(err.message || 'An error occurred');
