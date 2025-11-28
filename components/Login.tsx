@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Lock, Mail, Building2, Calendar, ShieldCheck, ChevronUp, ArrowRight, Loader2, AlertCircle, Database } from 'lucide-react';
-import { dataService } from '../services/dataService';
-import { UserRole, User as UserType } from '../types';
+import { dataService } from '../services/dataService.ts';
+import { UserRole, User as UserType } from '../types.ts';
 
 interface LoginProps {
   onLogin: (user: UserType) => void;

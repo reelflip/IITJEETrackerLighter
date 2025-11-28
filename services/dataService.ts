@@ -1,5 +1,5 @@
-import { Topic, TestScore, Task, User } from '../types';
-import { INITIAL_TOPICS, MOCK_TEST_DATA } from '../constants';
+import { Topic, TestScore, Task, User } from '../types.ts';
+import { INITIAL_TOPICS, MOCK_TEST_DATA } from '../constants.ts';
 
 // ============================================================================
 //  DATABASE CONFIGURATION

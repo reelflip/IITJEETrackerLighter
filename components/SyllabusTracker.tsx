@@ -1,5 +1,5 @@
 import React from 'react';
-import { Topic, Subject, Status } from '../types';
+import { Topic, Subject, Status } from '../types.ts';
 import { CheckCircle2, Circle, Clock, CheckCircle } from 'lucide-react';
 
 interface SyllabusTrackerProps {

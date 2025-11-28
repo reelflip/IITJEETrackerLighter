@@ -1,4 +1,4 @@
-import { Subject, Status, Topic } from './types';
+import { Subject, Status, Topic } from './types.ts';
 
 // A curated subset of the vast JEE syllabus for initial seeding
 export const INITIAL_TOPICS: Topic[] = [

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task } from '../types';
+import { Task } from '../types.ts';
 import { Check, Trash2, Plus, Calendar } from 'lucide-react';
 
 interface PlannerProps {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { TestScore } from '../types';
+import { TestScore } from '../types.ts';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, LabelList } from 'recharts';
 import { Plus, Filter } from 'lucide-react';
 

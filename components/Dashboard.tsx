@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Topic, TestScore, Status, User, Subject } from '../types';
+import { Topic, TestScore, Status, User, Subject } from '../types.ts';
 import { Quote, Search, LayoutGrid, Calendar as CalendarIcon, Save, ChevronDown, Info, Clock, CheckCircle2 } from 'lucide-react';
 
 interface DashboardProps {

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JEE PrepPro | iitgeeprep.com</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Babel for browser-side JSX/TSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
@@ -61,7 +63,19 @@
 </script>
 </head>
   <body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
+    <div id="root">
+        <!-- Loading Fallback -->
+        <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; color: #64748b;">
+            <div style="text-align: center;">
+                <svg class="animate-spin" style="width: 40px; height: 40px; margin-bottom: 16px; color: #4f46e5;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p>Loading Application...</p>
+            </div>
+        </div>
+    </div>
+    <!-- Note: data-type="module" allows using imports, data-presets includes typescript/react -->
+    <script type="text/babel" data-type="module" data-presets="react,typescript" src="./index.tsx"></script>
   </body>
 </html>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, BookOpen, LineChart, CheckSquare, Menu, X, Database, Server, Loader2, LogOut, ArrowLeft } from 'lucide-react';
-import Dashboard from './components/Dashboard';
-import SyllabusTracker from './components/SyllabusTracker';
-import TestAnalysis from './components/TestAnalysis';
-import SchemaViewer from './components/AiTutor'; 
-import Planner from './components/Planner';
-import Login from './components/Login';
-import { dataService } from './services/dataService';
-import { Topic, TestScore, Task, User } from './types';
+import Dashboard from './components/Dashboard.tsx';
+import SyllabusTracker from './components/SyllabusTracker.tsx';
+import TestAnalysis from './components/TestAnalysis.tsx';
+import SchemaViewer from './components/AiTutor.tsx'; 
+import Planner from './components/Planner.tsx';
+import Login from './components/Login.tsx';
+import { dataService } from './services/dataService.ts';
+import { Topic, TestScore, Task, User } from './types.ts';
 
 enum View {
   DASHBOARD = 'dashboard',
