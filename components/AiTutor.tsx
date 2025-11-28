@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- Default Admin User
+--
+INSERT IGNORE INTO users (name, email, password_hash, role, institute, target_year) VALUES 
+('Admin User', 'admin@iitgeeprep.com', 'admin123', 'student', 'IIT Bombay', 'IIT JEE 2025');
+
+--
 -- Table structure for table 'topics'
 --
 
@@ -406,7 +412,7 @@ $conn->close();
                     {activeTab === 'sql' && (
                         <button 
                             onClick={() => handleDownload(schemaSQL, 'jee_tracker_schema.sql')}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors border border-white/20"
                         >
                             <Download size={12} />
                             Download .sql
@@ -414,7 +420,7 @@ $conn->close();
                     )}
                     <button 
                         onClick={() => handleCopy(activeTab === 'sql' ? schemaSQL : phpAPI)}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors border border-white/20"
                     >
                         {copied ? <Check size={12} /> : <Copy size={12} />}
                         {copied ? 'Copied!' : 'Copy Code'}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, BookOpen, LineChart, CheckSquare, Menu, X, Database, Server, Loader2, LogOut } from 'lucide-react';
+import { LayoutDashboard, BookOpen, LineChart, CheckSquare, Menu, X, Database, Server, Loader2, LogOut, ArrowLeft } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import SyllabusTracker from './components/SyllabusTracker';
 import TestAnalysis from './components/TestAnalysis';
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showSetup, setShowSetup] = useState(false); // New state to allow access to setup before login
 
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -61,6 +62,7 @@ const App: React.FC = () => {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
+    setShowSetup(false);
   };
 
   const handleUpdateTopic = async (topic: Topic) => {
@@ -138,8 +140,25 @@ const App: React.FC = () => {
     }
   };
 
+  // Setup Mode (Access Schema without Login)
+  if (!isAuthenticated && showSetup) {
+      return (
+          <div className="min-h-screen bg-slate-50 p-4">
+              <div className="max-w-6xl mx-auto">
+                  <button 
+                    onClick={() => setShowSetup(false)}
+                    className="mb-4 flex items-center gap-2 text-slate-600 hover:text-indigo-600 font-medium transition-colors"
+                  >
+                      <ArrowLeft size={18} /> Back to Login
+                  </button>
+                  <SchemaViewer />
+              </div>
+          </div>
+      );
+  }
+
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} onShowSetup={() => setShowSetup(true)} />;
   }
 
   return (

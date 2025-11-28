@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { User, Lock, Mail, Building2, Calendar, ShieldCheck, ChevronUp, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { User, Lock, Mail, Building2, Calendar, ShieldCheck, ChevronUp, ArrowRight, Loader2, AlertCircle, Database } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { UserRole, User as UserType } from '../types';
 
 interface LoginProps {
   onLogin: (user: UserType) => void;
+  onShowSetup: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onShowSetup }) => {
   const [view, setView] = useState<'login' | 'register'>('register');
   const [userType, setUserType] = useState<UserRole>('student');
   const [isLoading, setIsLoading] = useState(false);
@@ -67,7 +68,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100 relative">
         
         {/* Header Section */}
         <div className="pt-8 pb-6 text-center bg-white">
@@ -285,10 +286,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </button>
             </form>
         </div>
-      </div>
-      
-      <div className="absolute bottom-4 text-center w-full text-slate-400 text-xs">
-         &copy; 2024 JEE PrepPro. All rights reserved.
+
+        {/* Database Setup Link */}
+        <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center text-xs">
+            <span className="text-slate-400">&copy; 2024 JEE PrepPro.</span>
+            <button 
+                onClick={onShowSetup}
+                className="flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 font-medium transition-colors"
+            >
+                <Database size={12} />
+                Database Setup
+            </button>
+        </div>
       </div>
     </div>
   );
