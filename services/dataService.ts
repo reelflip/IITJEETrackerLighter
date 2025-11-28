@@ -9,11 +9,9 @@ export const API_CONFIG = {
   // Set to TRUE to use the Python Backend
   USE_REAL_BACKEND: true, 
 
-  // DEVELOPMENT URL (Local Python Flask Server)
-  API_BASE_URL: 'http://localhost:5000/api'
-  
-  // PRODUCTION URL (Update this when you deploy to Render/PythonAnywhere/AWS)
-  // API_BASE_URL: 'https://your-python-backend.com/api' 
+  // PRODUCTION URL (Relative path works for both Vercel and Local if proxied)
+  // When deployed on Vercel, this points to the /api serverless function
+  API_BASE_URL: '/api'
 };
 
 // ============================================================================
@@ -47,7 +45,12 @@ const apiCall = async (action: string, method: 'GET' | 'POST' = 'GET', body?: an
         const userId = getCurrentUserId();
         
         // Construct URL with query parameters
-        const url = new URL(API_CONFIG.API_BASE_URL);
+        // Note: When API_BASE_URL is relative (starts with /), new URL() requires a base
+        const baseUrl = API_CONFIG.API_BASE_URL.startsWith('/') 
+            ? window.location.origin + API_CONFIG.API_BASE_URL 
+            : API_CONFIG.API_BASE_URL;
+
+        const url = new URL(baseUrl);
         url.searchParams.append('action', action);
         
         // Append userId to GET requests if available
