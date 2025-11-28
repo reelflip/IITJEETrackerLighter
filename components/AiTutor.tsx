@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Database, FileCode, Server, Code2, Copy, Check, Download } from 'lucide-react';
 
 const SchemaViewer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sql' | 'php'>('sql');
+  const [activeTab, setActiveTab] = useState<'sql' | 'python'>('sql');
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (text: string) => {
@@ -111,246 +111,233 @@ CREATE TABLE IF NOT EXISTS tasks (
 COMMIT;
 `;
 
-  const phpAPI = `<?php
-/**
- * SAVE THIS FILE AS: api.php
- * UPLOAD TO: public_html/ (or your iitgeeprep.com folder)
- * ensure services/dataService.ts points to https://iitgeeprep.com/api.php
- */
+  const pythonAPI = `# app.py
+# ------------------------------------------------------------------
+# PYTHON FLASK API for IIT JEE Tracker
+# ------------------------------------------------------------------
+# Requirements: 
+#   pip install flask flask-cors mysql-connector-python
+#
+# Run:
+#   python app.py
+# ------------------------------------------------------------------
 
-// Enable Error Reporting for Debugging (Disable in production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import mysql.connector
+from datetime import datetime
 
-// CORS Headers - Allow React App to Connect
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json");
+app = Flask(__name__)
+# Allow CORS so your React app can talk to this server
+CORS(app)
 
-// Handle Preflight Options Request
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
+# --- DATABASE CONFIGURATION ---
+DB_CONFIG = {
+    'user': 'u131922718_iitjee_user',
+    'password': 'YOUR_DB_PASSWORD',  # <--- REPLACE THIS
+    'host': 'localhost',
+    'database': 'u131922718_iitjee_tracker'
 }
 
-// --- DATABASE CONFIGURATION ---
-$host = 'localhost';
-$db   = 'u131922718_iitjee_tracker'; 
-$user = 'u131922718_iitjee_user'; 
-$pass = 'YOUR_DB_PASSWORD';  // <--- ENTER YOUR REAL DATABASE PASSWORD HERE
-// ------------------------------
+def get_db_connection():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        return conn
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return None
 
-$conn = new mysqli($host, $user, $pass, $db);
+# Helper to standardise responses
+def send_response(data):
+    return jsonify({"data": data}), 200
 
-if ($conn->connect_error) {
-    http_response_code(500);
-    die(json_encode(["error" => "Connection failed: " . $conn->connect_error]));
-}
+def send_error(message, code=400):
+    return jsonify({"error": message}), code
 
-$action = $_GET['action'] ?? '';
-$method = $_SERVER['REQUEST_METHOD'];
-$input = json_decode(file_get_contents('php://input'), true);
-
-// Helper to send JSON response
-function sendResponse($data) {
-    echo json_encode(["data" => $data]);
-    exit;
-}
-
-function sendError($msg) {
-    echo json_encode(["error" => $msg]);
-    exit;
-}
-
-// ---------------- API ROUTES ----------------
-
-// 1. User Registration
-if ($action === 'registerUser' && $method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, role, institute, target_year) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssss", $input['name'], $input['email'], $input['password'], $input['role'], $input['institute'], $input['targetYear']);
+@app.route('/api', methods=['GET', 'POST', 'OPTIONS'])
+def handle_api():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    action = request.args.get('action')
+    data = request.json if request.is_json else {}
     
-    if ($stmt->execute()) {
-        $input['id'] = $conn->insert_id;
-        // Also Seed Initial Topics for the new user
-        seedTopicsForUser($conn, $conn->insert_id);
-        unset($input['password']); // Don't return password
-        sendResponse($input);
-    } else {
-        sendError($stmt->error);
-    }
-}
-
-// 2. User Login
-if ($action === 'loginUser' && $method === 'POST') {
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-    $stmt->bind_param("s", $input['email']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $user = $result->fetch_assoc();
-
-    if ($user && $user['password_hash'] === $input['password']) {
-        unset($user['password_hash']); 
-        sendResponse($user);
-    } else {
-        sendError("Invalid credentials");
-    }
-}
-
-// 3. Get Topics
-if ($action === 'getTopics' && $method === 'GET') {
-    $userId = $_GET['userId'] ?? 0;
-    $stmt = $conn->prepare("SELECT * FROM topics WHERE user_id = ?");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $topics = [];
-    while ($row = $result->fetch_assoc()) {
-        $topics[] = $row;
-    }
-    sendResponse($topics);
-}
-
-// 4. Update Topic
-if ($action === 'updateTopic' && $method === 'POST') {
-    $stmt = $conn->prepare("UPDATE topics SET status=?, confidence=?, updated_at=NOW() WHERE id=?");
-    $stmt->bind_param("sii", $input['status'], $input['confidence'], $input['id']);
-    if ($stmt->execute()) {
-        // Return updated list
-        $userId = $input['userId'] ?? 0; // Ensure userId is passed in body
-        $stmtList = $conn->prepare("SELECT * FROM topics WHERE user_id = ?");
-        $stmtList->bind_param("i", $userId);
-        $stmtList->execute();
-        $res = $stmtList->get_result();
-        $all = [];
-        while ($r = $res->fetch_assoc()) $all[] = $r;
-        sendResponse($all);
-    } else {
-        sendError($stmt->error);
-    }
-}
-
-// 5. Get Scores
-if ($action === 'getScores' && $method === 'GET') {
-    $userId = $_GET['userId'] ?? 0;
-    $stmt = $conn->prepare("SELECT * FROM test_scores WHERE user_id = ?");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $scores = [];
-    while ($row = $result->fetch_assoc()) {
-        $scores[] = $row;
-    }
-    sendResponse($scores);
-}
-
-// 6. Add Score
-if ($action === 'addScore' && $method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO test_scores (user_id, test_name, test_date, physics_score, chemistry_score, math_score, max_score) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("issiiii", $input['userId'], $input['testName'], $input['date'], $input['physicsScore'], $input['chemistryScore'], $input['mathScore'], $input['maxScore']);
-    if ($stmt->execute()) {
-        $newId = $conn->insert_id;
-        // Return updated list
-        $stmtList = $conn->prepare("SELECT * FROM test_scores WHERE user_id = ?");
-        $stmtList->bind_param("i", $input['userId']);
-        $stmtList->execute();
-        $res = $stmtList->get_result();
-        $all = [];
-        while ($r = $res->fetch_assoc()) $all[] = $r;
-        sendResponse($all);
-    } else {
-        sendError($stmt->error);
-    }
-}
-
-// 7. Get Tasks
-if ($action === 'getTasks' && $method === 'GET') {
-    $userId = $_GET['userId'] ?? 0;
-    $stmt = $conn->prepare("SELECT * FROM tasks WHERE user_id = ?");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $tasks = [];
-    while ($row = $result->fetch_assoc()) {
-        // Convert 1/0 to true/false for frontend
-        $row['isCompleted'] = $row['is_completed'] == 1;
-        $row['dueDate'] = $row['due_date'];
-        $tasks[] = $row;
-    }
-    sendResponse($tasks);
-}
-
-// 8. Add Task
-if ($action === 'addTask' && $method === 'POST') {
-    $stmt = $conn->prepare("INSERT INTO tasks (user_id, title, due_date) VALUES (?, ?, ?)");
-    $stmt->bind_param("iss", $input['userId'], $input['title'], $input['dueDate']);
-    if ($stmt->execute()) {
-        fetchTasks($conn, $input['userId']);
-    } else { sendError($stmt->error); }
-}
-
-// 9. Toggle Task
-if ($action === 'toggleTask' && $method === 'POST') {
-    // First check current status
-    $check = $conn->prepare("SELECT is_completed FROM tasks WHERE id = ?");
-    $check->bind_param("i", $input['id']);
-    $check->execute();
-    $row = $check->get_result()->fetch_assoc();
-    $newState = $row['is_completed'] == 1 ? 0 : 1;
-
-    $stmt = $conn->prepare("UPDATE tasks SET is_completed = ? WHERE id = ?");
-    $stmt->bind_param("ii", $newState, $input['id']);
-    if ($stmt->execute()) {
-        fetchTasks($conn, $input['userId']);
-    } else { sendError($stmt->error); }
-}
-
-// 10. Delete Task
-if ($action === 'deleteTask' && $method === 'POST') {
-    $stmt = $conn->prepare("DELETE FROM tasks WHERE id = ?");
-    $stmt->bind_param("i", $input['id']);
-    if ($stmt->execute()) {
-        fetchTasks($conn, $input['userId']);
-    } else { sendError($stmt->error); }
-}
-
-// Utility to return task list after mod
-function fetchTasks($conn, $userId) {
-    $stmt = $conn->prepare("SELECT * FROM tasks WHERE user_id = ?");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $tasks = [];
-    while ($row = $result->fetch_assoc()) {
-        $row['isCompleted'] = $row['is_completed'] == 1;
-        $row['dueDate'] = $row['due_date'];
-        $tasks[] = $row;
-    }
-    sendResponse($tasks);
-}
-
-// Utility to seed topics
-function seedTopicsForUser($conn, $userId) {
-    // Basic seed data
-    $topics = [
-        ['Units & Dimensions', 'Physics', 'Completed', 9],
-        ['Kinematics', 'Physics', 'Completed', 8],
-        ['Newtons Laws', 'Physics', 'In Progress', 6],
-        ['Mole Concept', 'Chemistry', 'Completed', 9],
-        ['Atomic Structure', 'Chemistry', 'In Progress', 7],
-        ['Sets & Relations', 'Mathematics', 'Completed', 8],
-        ['Quadratic Equations', 'Mathematics', 'In Progress', 5]
-    ];
+    conn = get_db_connection()
+    if not conn:
+        return send_error("Database connection failed", 500)
     
-    $stmt = $conn->prepare("INSERT INTO topics (user_id, name, subject, status, confidence) VALUES (?, ?, ?, ?, ?)");
-    foreach ($topics as $t) {
-        $stmt->bind_param("isssi", $userId, $t[0], $t[1], $t[2], $t[3]);
-        $stmt->execute();
-    }
-}
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # 1. Register User
+        if action == 'registerUser' and request.method == 'POST':
+            sql = "INSERT INTO users (name, email, password_hash, role, institute, target_year) VALUES (%s, %s, %s, %s, %s, %s)"
+            val = (data.get('name'), data.get('email'), data.get('password'), data.get('role'), data.get('institute'), data.get('targetYear'))
+            cursor.execute(sql, val)
+            conn.commit()
+            
+            new_user_id = cursor.lastrowid
+            data['id'] = new_user_id
+            del data['password']
+            
+            # Seed topics
+            seed_topics(conn, new_user_id)
+            return send_response(data)
 
-$conn->close();
-?>`;
+        # 2. Login User
+        elif action == 'loginUser' and request.method == 'POST':
+            sql = "SELECT * FROM users WHERE email = %s"
+            cursor.execute(sql, (data.get('email'),))
+            user = cursor.fetchone()
+            
+            if user and user['password_hash'] == data.get('password'):
+                del user['password_hash']
+                return send_response(user)
+            else:
+                return send_error("Invalid credentials")
+
+        # 3. Get Topics
+        elif action == 'getTopics':
+            user_id = request.args.get('userId')
+            cursor.execute("SELECT * FROM topics WHERE user_id = %s", (user_id,))
+            topics = cursor.fetchall()
+            return send_response(topics)
+
+        # 4. Update Topic
+        elif action == 'updateTopic' and request.method == 'POST':
+            sql = "UPDATE topics SET status=%s, confidence=%s, updated_at=NOW() WHERE id=%s"
+            cursor.execute(sql, (data.get('status'), data.get('confidence'), data.get('id')))
+            conn.commit()
+            
+            # Return updated list
+            user_id = data.get('userId')
+            cursor.execute("SELECT * FROM topics WHERE user_id = %s", (user_id,))
+            return send_response(cursor.fetchall())
+
+        # 5. Get Scores
+        elif action == 'getScores':
+            user_id = request.args.get('userId')
+            cursor.execute("SELECT * FROM test_scores WHERE user_id = %s", (user_id,))
+            
+            # Convert date objects to strings
+            scores = cursor.fetchall()
+            for s in scores:
+                if s['test_date']:
+                    s['test_date'] = str(s['test_date'])
+            
+            return send_response(scores)
+
+        # 6. Add Score
+        elif action == 'addScore' and request.method == 'POST':
+            sql = "INSERT INTO test_scores (user_id, test_name, test_date, physics_score, chemistry_score, math_score, max_score) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            val = (data.get('userId'), data.get('testName'), data.get('date'), data.get('physicsScore'), data.get('chemistryScore'), data.get('mathScore'), data.get('maxScore'))
+            cursor.execute(sql, val)
+            conn.commit()
+            
+            # Return updated list
+            cursor.execute("SELECT * FROM test_scores WHERE user_id = %s", (data.get('userId'),))
+            scores = cursor.fetchall()
+            for s in scores:
+                if s['test_date']:
+                    s['test_date'] = str(s['test_date'])
+            return send_response(scores)
+
+        # 7. Get Tasks
+        elif action == 'getTasks':
+            user_id = request.args.get('userId')
+            cursor.execute("SELECT * FROM tasks WHERE user_id = %s", (user_id,))
+            tasks = cursor.fetchall()
+            # Convert DB format to Frontend format
+            frontend_tasks = []
+            for t in tasks:
+                frontend_tasks.append({
+                    'id': t['id'],
+                    'title': t['title'],
+                    'isCompleted': bool(t['is_completed']),
+                    'dueDate': str(t['due_date']) if t['due_date'] else ''
+                })
+            return send_response(frontend_tasks)
+
+        # 8. Add Task
+        elif action == 'addTask' and request.method == 'POST':
+            sql = "INSERT INTO tasks (user_id, title, due_date) VALUES (%s, %s, %s)"
+            cursor.execute(sql, (data.get('userId'), data.get('title'), data.get('dueDate')))
+            conn.commit()
+            return fetch_tasks(cursor, data.get('userId'))
+
+        # 9. Toggle Task
+        elif action == 'toggleTask' and request.method == 'POST':
+            task_id = data.get('id')
+            # Get current
+            cursor.execute("SELECT is_completed FROM tasks WHERE id = %s", (task_id,))
+            current = cursor.fetchone()
+            new_status = 0 if current['is_completed'] else 1
+            
+            cursor.execute("UPDATE tasks SET is_completed = %s WHERE id = %s", (new_status, task_id))
+            conn.commit()
+            
+            # Get User ID for this task to refresh list
+            cursor.execute("SELECT user_id FROM tasks WHERE id = %s", (task_id,))
+            uid = cursor.fetchone()['user_id']
+            return fetch_tasks(cursor, uid)
+            
+        # 10. Delete Task
+        elif action == 'deleteTask' and request.method == 'POST':
+            task_id = data.get('id')
+            # Get User ID first
+            cursor.execute("SELECT user_id FROM tasks WHERE id = %s", (task_id,))
+            row = cursor.fetchone()
+            if row:
+                uid = row['user_id']
+                cursor.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
+                conn.commit()
+                return fetch_tasks(cursor, uid)
+            return send_response([])
+
+        else:
+            return send_error(f"Unknown action: {action}")
+
+    except Exception as e:
+        print(e)
+        return send_error(str(e), 500)
+    finally:
+        cursor.close()
+        conn.close()
+
+def fetch_tasks(cursor, user_id):
+    cursor.execute("SELECT * FROM tasks WHERE user_id = %s", (user_id,))
+    tasks = cursor.fetchall()
+    frontend_tasks = []
+    for t in tasks:
+        frontend_tasks.append({
+            'id': t['id'],
+            'title': t['title'],
+            'isCompleted': bool(t['is_completed']),
+            'dueDate': str(t['due_date']) if t['due_date'] else ''
+        })
+    return send_response(frontend_tasks)
+
+def seed_topics(conn, user_id):
+    cursor = conn.cursor()
+    topics = [
+        ('Units & Dimensions', 'Physics', 'Completed', 9),
+        ('Kinematics', 'Physics', 'Completed', 8),
+        ('Newtons Laws', 'Physics', 'In Progress', 6),
+        ('Mole Concept', 'Chemistry', 'Completed', 9),
+        ('Atomic Structure', 'Chemistry', 'In Progress', 7),
+        ('Sets & Relations', 'Mathematics', 'Completed', 8),
+        ('Quadratic Equations', 'Mathematics', 'In Progress', 5)
+    ]
+    sql = "INSERT INTO topics (user_id, name, subject, status, confidence) VALUES (%s, %s, %s, %s, %s)"
+    for t in topics:
+        cursor.execute(sql, (user_id, t[0], t[1], t[2], t[3]))
+    conn.commit()
+    cursor.close()
+
+if __name__ == '__main__':
+    # Run on port 5000
+    app.run(debug=True, port=5000)
+`;
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
@@ -360,8 +347,8 @@ $conn->close();
                 <Database className="text-white w-5 h-5" />
             </div>
             <div>
-                <h2 className="text-white font-bold text-lg">Backend Integration</h2>
-                <p className="text-slate-300 text-xs">Setup your Real MySQL Database</p>
+                <h2 className="text-white font-bold text-lg">Backend Integration (Python)</h2>
+                <p className="text-slate-300 text-xs">Setup your Real MySQL Database with Flask</p>
             </div>
         </div>
         
@@ -373,10 +360,10 @@ $conn->close();
                 1. DB Schema
             </button>
             <button 
-                onClick={() => setActiveTab('php')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'php' ? 'bg-white text-slate-900 shadow' : 'text-slate-300 hover:text-white'}`}
+                onClick={() => setActiveTab('python')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'python' ? 'bg-white text-slate-900 shadow' : 'text-slate-300 hover:text-white'}`}
             >
-                2. API Script
+                2. Python Script
             </button>
         </div>
       </div>
@@ -389,12 +376,12 @@ $conn->close();
                 </div>
                 <div>
                     <h3 className="text-lg font-bold text-slate-800">
-                        {activeTab === 'sql' ? 'Step 1: Create Database Tables' : 'Step 2: Connect via API'}
+                        {activeTab === 'sql' ? 'Step 1: Create Database Tables' : 'Step 2: Connect via Python API'}
                     </h3>
                     <p className="text-slate-600 text-sm mt-1 max-w-3xl">
                         {activeTab === 'sql' 
                             ? "Download the SQL file below and import it via phpMyAdmin. This will create all the necessary tables for the app to function." 
-                            : "React cannot connect directly to MySQL for security. You must use an API. Copy the PHP code below, save it as 'api.php', add your password, and upload it to your website folder."}
+                            : "Copy the Python code below, save it as 'app.py', and run it on your server. Ensure you have installed Flask and mysql-connector-python."}
                     </p>
                 </div>
             </div>
@@ -403,9 +390,9 @@ $conn->close();
         <div className="bg-[#1e1e1e] rounded-xl overflow-hidden shadow-lg border border-slate-800 relative">
             <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-white/10">
                 <div className="flex items-center gap-2">
-                    {activeTab === 'sql' ? <Database size={14} className="text-blue-400" /> : <Code2 size={14} className="text-purple-400" />}
+                    {activeTab === 'sql' ? <Database size={14} className="text-blue-400" /> : <Code2 size={14} className="text-yellow-400" />}
                     <span className="text-xs text-slate-300 font-mono">
-                        {activeTab === 'sql' ? 'schema.sql' : 'api.php'}
+                        {activeTab === 'sql' ? 'schema.sql' : 'app.py'}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -419,7 +406,7 @@ $conn->close();
                         </button>
                     )}
                     <button 
-                        onClick={() => handleCopy(activeTab === 'sql' ? schemaSQL : phpAPI)}
+                        onClick={() => handleCopy(activeTab === 'sql' ? schemaSQL : pythonAPI)}
                         className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors border border-white/20"
                     >
                         {copied ? <Check size={12} /> : <Copy size={12} />}
@@ -428,8 +415,8 @@ $conn->close();
                 </div>
             </div>
             <pre className="p-4 text-sm font-mono leading-relaxed overflow-x-auto h-[400px]">
-                <code className={activeTab === 'sql' ? 'text-blue-100' : 'text-purple-100'}>
-                    {activeTab === 'sql' ? schemaSQL : phpAPI}
+                <code className={activeTab === 'sql' ? 'text-blue-100' : 'text-yellow-100'}>
+                    {activeTab === 'sql' ? schemaSQL : pythonAPI}
                 </code>
             </pre>
         </div>

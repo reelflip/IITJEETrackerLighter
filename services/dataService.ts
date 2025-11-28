@@ -6,12 +6,14 @@ import { INITIAL_TOPICS, MOCK_TEST_DATA } from '../constants.ts';
 // ============================================================================
 
 export const API_CONFIG = {
-  // Set to TRUE to use the PHP/MySQL Backend
+  // Set to TRUE to use the Python Backend
   USE_REAL_BACKEND: true, 
 
-  // The full URL to the api.php file on your server
-  API_BASE_URL: 'https://iitgeeprep.com/api.php' 
-  // API_BASE_URL: 'http://localhost/jee-tracker/api.php' // Use this for local testing
+  // DEVELOPMENT URL (Local Python Flask Server)
+  API_BASE_URL: 'http://localhost:5000/api'
+  
+  // PRODUCTION URL (Update this when you deploy to Render/PythonAnywhere/AWS)
+  // API_BASE_URL: 'https://your-python-backend.com/api' 
 };
 
 // ============================================================================
@@ -71,7 +73,7 @@ const apiCall = async (action: string, method: 'GET' | 'POST' = 'GET', body?: an
 
         const response = await fetch(url.toString(), options);
         
-        // Handle non-JSON responses (like PHP errors printed to screen)
+        // Handle non-JSON responses (like PHP/Python errors printed to screen)
         const text = await response.text();
         let result;
         try {
