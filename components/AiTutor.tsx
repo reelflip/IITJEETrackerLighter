@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, FileCode, Server, Code2, Copy, Check } from 'lucide-react';
+import { Database, FileCode, Server, Code2, Copy, Check, Download } from 'lucide-react';
 
 const SchemaViewer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sql' | 'php'>('sql');
@@ -11,13 +11,36 @@ const SchemaViewer: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownload = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   const schemaSQL = `-- --------------------------------------------------------
--- HOSTING SETUP INSTRUCTIONS:
--- 1. Select your assigned database in phpMyAdmin: u131922718_iitjee_tracker
--- 2. Run the SQL below to create the required tables.
+-- DATABASE IMPORT SCRIPT for u131922718_iitjee_tracker
+-- --------------------------------------------------------
+-- INSTRUCTIONS:
+-- 1. Log in to phpMyAdmin.
+-- 2. Select the database: u131922718_iitjee_tracker
+-- 3. Click "Import" tab at the top.
+-- 4. Upload this file and click "Go".
 -- --------------------------------------------------------
 
--- Users Table
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+--
+-- Table structure for table 'users'
+--
+
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -29,9 +52,12 @@ CREATE TABLE IF NOT EXISTS users (
     security_question VARCHAR(255),
     security_answer_hash VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Topics Table
+--
+-- Table structure for table 'topics'
+--
+
 CREATE TABLE IF NOT EXISTS topics (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL, 
@@ -42,9 +68,12 @@ CREATE TABLE IF NOT EXISTS topics (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Test Scores Table
+--
+-- Table structure for table 'test_scores'
+--
+
 CREATE TABLE IF NOT EXISTS test_scores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -57,9 +86,12 @@ CREATE TABLE IF NOT EXISTS test_scores (
     max_score INT DEFAULT 300,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tasks Table
+--
+-- Table structure for table 'tasks'
+--
+
 CREATE TABLE IF NOT EXISTS tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -68,7 +100,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     due_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+COMMIT;
 `;
 
   const phpAPI = `<?php
@@ -353,7 +387,7 @@ $conn->close();
                     </h3>
                     <p className="text-slate-600 text-sm mt-1 max-w-3xl">
                         {activeTab === 'sql' 
-                            ? "Copy the SQL code below and run it in your phpMyAdmin's 'SQL' tab. This will create the necessary tables to store users, topics, and test scores." 
+                            ? "Download the SQL file below and import it via phpMyAdmin. This will create all the necessary tables for the app to function." 
                             : "React cannot connect directly to MySQL for security. You must use an API. Copy the PHP code below, save it as 'api.php', add your password, and upload it to your website folder."}
                     </p>
                 </div>
@@ -368,13 +402,24 @@ $conn->close();
                         {activeTab === 'sql' ? 'schema.sql' : 'api.php'}
                     </span>
                 </div>
-                <button 
-                    onClick={() => handleCopy(activeTab === 'sql' ? schemaSQL : phpAPI)}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors"
-                >
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                    {copied ? 'Copied!' : 'Copy Code'}
-                </button>
+                <div className="flex items-center gap-2">
+                    {activeTab === 'sql' && (
+                        <button 
+                            onClick={() => handleDownload(schemaSQL, 'jee_tracker_schema.sql')}
+                            className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors"
+                        >
+                            <Download size={12} />
+                            Download .sql
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => handleCopy(activeTab === 'sql' ? schemaSQL : phpAPI)}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors"
+                    >
+                        {copied ? <Check size={12} /> : <Copy size={12} />}
+                        {copied ? 'Copied!' : 'Copy Code'}
+                    </button>
+                </div>
             </div>
             <pre className="p-4 text-sm font-mono leading-relaxed overflow-x-auto h-[400px]">
                 <code className={activeTab === 'sql' ? 'text-blue-100' : 'text-purple-100'}>
